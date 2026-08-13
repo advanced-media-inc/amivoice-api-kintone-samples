@@ -385,7 +385,6 @@
             }
 
             renderStatusBadge('AmiVoice: completed', '#2e7d32');
-            setAutoDone(appId, recordId);
             window.location.reload();
             return true;
         } catch (error) {
