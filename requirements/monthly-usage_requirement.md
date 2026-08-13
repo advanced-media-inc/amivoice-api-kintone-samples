@@ -9,7 +9,7 @@ curl -O -J \
   -H "Authorization: Bearer {APIKEY}" \
   "https://acp.amivoice.com/util/api/downloadusage/Ami.{serviceID}/{yyyymm}"
 
-２）kintoneのフォームから {APIKEY}と{serviceID}と{yyyymm}が入力されるx/
+２）kintoneのフォームから {APIKEY} と {serviceID} と {yyyymm} が入力される。
 フォーム名はそれぞれ、apikey,serviceid,date
 例外：serviceIDの末尾が01で終わる場合httpは下記のようにami.がつかない
   "https://acp.amivoice.com/util/api/downloadusage/{serviceID}/{yyyymm}"
