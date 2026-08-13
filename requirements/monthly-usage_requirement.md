@@ -11,7 +11,7 @@ curl -O -J \
 
 ２）kintoneのフォームから {APIKEY} と {serviceID} と {yyyymm} が入力される。
 フォーム名はそれぞれ、apikey,serviceid,date
-例外：serviceIDの末尾が01で終わる場合httpは下記のようにami.がつかない
+例外：serviceIDの末尾が01で終わる場合、HTTPは下記のようにAmi.がつかない
   "https://acp.amivoice.com/util/api/downloadusage/{serviceID}/{yyyymm}"
 
 
