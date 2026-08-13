@@ -1,8 +1,5 @@
 (function () {
     'use strict';
-
-    //alert('JS FILE LOADED');
-
     const PLUGIN_ID = kintone.$PLUGIN_ID;
     const config = kintone.plugin.app.getConfig(PLUGIN_ID);
     const QUEUE_KEY = 'amivoice_stt_queue';
