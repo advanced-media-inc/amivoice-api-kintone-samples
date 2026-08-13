@@ -1,8 +1,5 @@
 (function () {
     'use strict';
-
-    //alert('JS FILE LOADED');
-
     const PLUGIN_ID = kintone.$PLUGIN_ID;
     const config = kintone.plugin.app.getConfig(PLUGIN_ID);
     const QUEUE_KEY = 'amivoice_stt_queue';
@@ -349,6 +346,9 @@
             );
             const responseBody = responseWithTimeout[0];
             const statusCode = responseWithTimeout[1];
+            if (statusCode < 200 || statusCode >= 300) {
+                throw new Error('AmiVoice recognize failed: HTTP ' + statusCode + ' ' + responseBody);
+            }
 
             let resultText = '';
             try {
@@ -388,7 +388,6 @@
             }
 
             renderStatusBadge('AmiVoice: completed', '#2e7d32');
-            setAutoDone(appId, recordId);
             window.location.reload();
             return true;
         } catch (error) {
