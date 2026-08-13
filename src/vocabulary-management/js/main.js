@@ -12,10 +12,6 @@
         spoken: 'word_reading',
         className: 'word_class'
     };
-    var CLASS_NAMES = [
-        '固有名詞', '名前', '名前(名)', '駅名', '地名', '会社名',
-        '部署名', '役職名', '記号', '括弧開き', '括弧閉じ', '元号'
-    ];
     var ENGINE_MAP = {
         '日本語E2E_汎用': '-a2-ja-general',
         '中国語E2E_汎用': '-a2-zh-general',
