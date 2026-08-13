@@ -346,6 +346,9 @@
             );
             const responseBody = responseWithTimeout[0];
             const statusCode = responseWithTimeout[1];
+            if (statusCode < 200 || statusCode >= 300) {
+                throw new Error('AmiVoice recognize failed: HTTP ' + statusCode + ' ' + responseBody);
+            }
 
             let resultText = '';
             try {
