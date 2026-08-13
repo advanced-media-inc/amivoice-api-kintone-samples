@@ -45,7 +45,10 @@
     function getTableCodes(record, tableCode) {
         var table = record && record[tableCode];
         var firstRow = table && table.value && table.value[0];
-        return firstRow && firstRow.value ? Object.keys(firstRow.value) : [];
+        if (!firstRow || !firstRow.value) {
+            throw new Error(tableCode + ' に行がないため列を自動判定できません。空行を1行追加してから再実行してください。');
+        }
+        return Object.keys(firstRow.value);
     }
 
     function findCode(codes, patterns, fallbackIndex) {
