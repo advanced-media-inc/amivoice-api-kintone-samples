@@ -57,6 +57,9 @@
 
     function makeQuantityRows(record, rows) {
         var codes = getTableCodes(record, 'quantity_table');
+        if (codes.length === 0) {
+            throw new Error('quantity_table の列コードを取得できませんでした。テーブルに行が存在しないか、フィールドコードが取得できません。');
+        }
         var columns = [
             findCode(codes, [/yyyymm/i, /year/i, /month/i, /年月/], 0),
             findCode(codes, [/account/i, /アカウント/], 1),
@@ -74,6 +77,9 @@
 
     function makeCostRows(record, rows) {
         var codes = getTableCodes(record, 'cost_table');
+        if (codes.length === 0) {
+            throw new Error('cost_table の列コードを取得できませんでした。テーブルに行が存在しないか、フィールドコードが取得できません。');
+        }
         var columns = [
             findCode(codes, [/engine/i, /plan/i, /エンジン/], 0),
             findCode(codes, [/cost/i, /price/i, /料金/, /金額/], 1)
