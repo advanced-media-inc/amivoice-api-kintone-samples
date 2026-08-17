@@ -134,6 +134,7 @@
         var input = fieldElement && fieldElement.querySelector('input');
         if (input) {
             input.type = 'password';
+            return;
         }
         if ((retryCount || 0) < 5) {
             window.setTimeout(function () {
