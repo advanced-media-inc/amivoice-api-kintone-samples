@@ -22,7 +22,7 @@
             if (input) return input;
         }
 
-        return document.querySelector('.input-text-cybozu');
+        return null;
     }
 
     function addToggleButton(input) {
