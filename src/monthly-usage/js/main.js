@@ -3,7 +3,7 @@
     'use strict';
 
     var API_BASE_URL = 'https://acp.amivoice.com/util/api/downloadusage/';
-    var BUTTON_ID = 'amivoice-download-usage-button';
+    var MASK_TEXT = '********';
 
     function fieldValue(record, fieldCode) {
         var field = record && record[fieldCode];
@@ -45,10 +45,7 @@
     function getTableCodes(record, tableCode) {
         var table = record && record[tableCode];
         var firstRow = table && table.value && table.value[0];
-        if (!firstRow || !firstRow.value) {
-            throw new Error(tableCode + ' に行がないため列を自動判定できません。空行を1行追加してから再実行してください。');
-        }
-        return Object.keys(firstRow.value);
+        return firstRow && firstRow.value ? Object.keys(firstRow.value) : [];
     }
 
     function findCode(codes, patterns, fallbackIndex) {
@@ -60,6 +57,9 @@
 
     function makeQuantityRows(record, rows) {
         var codes = getTableCodes(record, 'quantity_table');
+        if (codes.length === 0) {
+            throw new Error('quantity_table の列コードを取得できませんでした。テーブルに行が存在しないか、フィールドコードが取得できません。');
+        }
         var columns = [
             findCode(codes, [/yyyymm/i, /year/i, /month/i, /年月/], 0),
             findCode(codes, [/account/i, /アカウント/], 1),
@@ -77,6 +77,9 @@
 
     function makeCostRows(record, rows) {
         var codes = getTableCodes(record, 'cost_table');
+        if (codes.length === 0) {
+            throw new Error('cost_table の列コードを取得できませんでした。テーブルに行が存在しないか、フィールドコードが取得できません。');
+        }
         var columns = [
             findCode(codes, [/engine/i, /plan/i, /エンジン/], 0),
             findCode(codes, [/cost/i, /price/i, /料金/, /金額/], 1)
@@ -118,40 +121,48 @@
     function maskApiKeyField() {
         var fieldElement = kintone.app.record.getFieldElement('apikey');
         if (!fieldElement) return;
-        fieldElement.innerHTML = '<span class="control-value-gaia">********</span>';
-        window.setTimeout(function () {
-            var currentFieldElement = kintone.app.record.getFieldElement('apikey');
-            if (currentFieldElement) {
-                currentFieldElement.innerHTML = '<span class="control-value-gaia">********</span>';
-            }
-        }, 0);
+        if (fieldElement.textContent && fieldElement.textContent.trim() !== '') {
+            fieldElement.textContent = MASK_TEXT;
+        }
     }
 
     function maskApiKeyInIndex() {
         var fieldElements = kintone.app.getFieldElements('apikey') || [];
         fieldElements.forEach(function (fieldElement) {
-            fieldElement.textContent = '********';
+            if (fieldElement.textContent && fieldElement.textContent.trim() !== '') {
+                fieldElement.textContent = MASK_TEXT;
+            }
         });
     }
 
-    function usePasswordInputForApiKey() {
+    function usePasswordInputForApiKey(retryCount) {
         var fieldElement = kintone.app.record.getFieldElement('apikey');
         var input = fieldElement && fieldElement.querySelector('input');
-        if (input) input.type = 'password';
+        if (input) {
+            input.type = 'password';
+            return;
+        }
+        if ((retryCount || 0) < 5) {
+            window.setTimeout(function () {
+                usePasswordInputForApiKey((retryCount || 0) + 1);
+            }, 100);
+        }
     }
 
-    async function downloadUsage(event) {
-        var record = event.record;
+    // 保存直後にCSVを取得し、テーブル更新とAPIキーの消去を1回のPUTで行う。
+    async function processUsageAfterSave(appId, recordId, record) {
         var apiKey = fieldValue(record, 'apikey');
         var serviceId = fieldValue(record, 'serviceid');
         var yyyymm = fieldValue(record, 'date');
+
+        var updatePayload = { apikey: { value: '' } };
+
         if (!apiKey || !serviceId || !/^\d{6}$/.test(yyyymm)) {
-            window.alert('apikey、serviceid、date（YYYYMM）を入力してください。');
-            return event;
+            window.alert('apikey、serviceid、date（YYYYMM）が未入力のため、料金明細を取得できませんでした。');
+            await updateRecord(appId, recordId, updatePayload);
+            return;
         }
 
-        var button = document.getElementById(BUTTON_ID);
-        if (button) button.disabled = true;
         try {
             var lines = parseCsv(await requestUsageCsv(apiKey, serviceId, yyyymm));
             var quantityRows = [];
@@ -172,32 +183,19 @@
             var costRows = Object.keys(costByPlan).map(function (plan) {
                 return [plan, String(costByPlan[plan])];
             });
-            await updateRecord(kintone.app.getId(), event.recordId, {
-                quantity_table: { value: makeQuantityRows(record, quantityRows) },
-                cost_table: { value: makeCostRows(record, costRows) }
-            });
-            window.alert('料金明細を更新しました。');
-            window.location.reload();
+
+            updatePayload.quantity_table = { value: makeQuantityRows(record, quantityRows) };
+            updatePayload.cost_table = { value: makeCostRows(record, costRows) };
         } catch (error) {
             console.error('[AmiVoice cost manager]', error);
             window.alert('料金明細の取得に失敗しました: ' + (error.message || error));
-        } finally {
-            if (button) button.disabled = false;
         }
-        return event;
+
+        await updateRecord(appId, recordId, updatePayload);
     }
 
     kintone.events.on('app.record.detail.show', function (event) {
         maskApiKeyField();
-        var space = kintone.app.record.getHeaderMenuSpaceElement();
-        if (!space || document.getElementById(BUTTON_ID)) return event;
-        var button = document.createElement('button');
-        button.id = BUTTON_ID;
-        button.type = 'button';
-        button.textContent = '料金明細を取得';
-        button.className = 'kintoneplugin-button-normal';
-        button.addEventListener('click', function () { downloadUsage(event); });
-        space.appendChild(button);
         return event;
     });
 
@@ -210,4 +208,16 @@
         usePasswordInputForApiKey();
         return event;
     });
+
+    kintone.events.on([
+        'app.record.create.submit.success',
+        'app.record.edit.submit.success'
+    ], function (event) {
+        processUsageAfterSave(kintone.app.getId(), event.recordId, event.record).catch(function (error) {
+            console.error('[AmiVoice cost manager] post-save processing failed', error);
+            window.alert('保存後の料金明細取得に失敗しました。詳細はコンソールを確認してください。');
+        });
+        return event;
+    });
 }());
+
