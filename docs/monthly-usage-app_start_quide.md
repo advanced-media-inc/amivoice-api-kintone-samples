@@ -1,4 +1,4 @@
-# AmiVoice 使用量CSV表示アプリ（AmiCSVVirewer） スタートガイド
+# AmiVoice 使用量CSV表示アプリ（AmiCOSTViewer） スタートガイド
 
 ## 1. 概要
 
