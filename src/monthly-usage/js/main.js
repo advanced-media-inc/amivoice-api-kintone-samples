@@ -208,6 +208,7 @@
     ], function (event) {
         processUsageAfterSave(kintone.app.getId(), event.recordId, event.record).catch(function (error) {
             console.error('[AmiVoice cost manager] post-save processing failed', error);
+            window.alert('保存後の料金明細取得に失敗しました。詳細はコンソールを確認してください。');
         });
         return event;
     });
