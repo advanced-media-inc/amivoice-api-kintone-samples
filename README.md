@@ -24,7 +24,7 @@ apps/                       kintoneアプリテンプレート（レコード・
 
 plugins/                    kintoneプラグイン本体（配布用zip）
   monthly-usage/               ami_cost_100.zip
-  speech-to-text/              ami_stt_100.zip, ami_stt_200.zip
+  speech-to-text/              ami_stt_100.zip
   vocabulary-management/       ami_vocab_100.zip
 
 src/                        各プラグインのソースコード（プラグイン化前のJavaScript）
