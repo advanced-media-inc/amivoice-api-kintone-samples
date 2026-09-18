@@ -70,7 +70,7 @@ requirements/                各アプリの要件定義メモ
 3. `JavaScript_customize/ami_maskkey.js` を対象アプリの「JavaScript / CSS カスタマイズ」に追加します（スコープ: デスクトップ）。
 4. 各アプリのスタートガイド（`docs/`）に従い、フィールド設定・プラグイン設定を行います。
 
-詳細な手順は [docs/getting-started.md](docs/getting-started.md) およびアプリごとのスタートガイドを参照してください。
+詳細な手順は各アプリのスタートガイド（`docs/`）を参照してください。
 
 ## ドキュメント
 
