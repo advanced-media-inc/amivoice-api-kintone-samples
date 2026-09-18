@@ -74,7 +74,7 @@ requirements/                各アプリの要件定義メモ
 
 ## ドキュメント
 
-- [docs/architecture.md](docs/architecture.md) — システム構成
+- [Speech to Text スタートガイド](docs/speech-to-text-app_start_quide.md)、[月次使用量表示スタートガイド](docs/monthly-usage-app_start_quide.md)、[ユーザー辞書登録スタートガイド](docs/vocabulary-management-app_start_quide.md) — 各アプリの導入・操作手順
 - [docs/getting-started.md](docs/getting-started.md) — 導入の全体的な流れ
 - [requirements/monthly-usage_requirement.md](requirements/monthly-usage_requirement.md) — 月次使用量表示アプリの要件
 - [requirements/vocabulary-management-app_requirements.md](requirements/vocabulary-management-app_requirements.md) — ユーザー辞書登録アプリの要件
