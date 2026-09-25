@@ -1,11 +1,13 @@
-# AmiVoice 使用量CSV表示アプリ（AmiCOSTViewer） スタートガイド
+# AmiVoice 使用量CSV表示アプリ（AmiCostViewerES） スタートガイド
 
 ## 1. 概要
 
-本アプリケーションは、AmiVoice API の使用量 CSV を動的に取得し、kintoneのテーブルに使用量（秒数）と料金（円）を表示します。
+本アプリケーションは、AmiVoice API の使用量 CSV を動的に取得し、kintoneのテーブルに使用量（ミリ秒）と料金（円）を表示します。
 
 - `quantity_table`: 使用量の明細
 - `cost_table`: エンジンプランごとの料金
+
+**注意**: 本プラグインが使用する CSV 取得エンドポイント（`https://acp.amivoice.com/util/api/downloadusage/...`）は、AmiVoice API の公開ドキュメント（[docs.amivoice.com](https://docs.amivoice.com/)）には記載されていません。予告なく仕様が変更される可能性がある点に留意してください。
 
 ## 2. 利用前の準備
 
@@ -90,7 +92,7 @@ API キーをマスク表示するため、kintone アプリにカスタムス�
 6. プラグインが自動的に AmiVoice API から料金明細を取得し、テーブルを更新します。
 7. 更新完了後、最新の料金明細がテーブルに反映されます（ページの再読み込みは行われません）。
 
-処理完了後、`quantity_table` と `cost_table` に料金明細が自動的に保存されます。取得中はレコード編集が一時的に無効になります。
+処理完了後、`quantity_table` と `cost_table` に料金明細が自動的に保存されます。取得・保存が終わるまでレコード詳細画面の表示が待たされるため、表示された時点で料金明細は反映済みです（編集ロックは行われません）。
 
 ## 5. 表示されるデータ
 

@@ -1,0 +1,19 @@
+{
+    "manifest_version": 1,
+    "version": "1.1.1",
+    "type": "APP",
+    "name": {
+        "ja": "AmiVoice 料金明細表示",
+        "en": "AmiVoice Usage Cost Viewer"
+    },
+    "description": {
+        "ja": "AmiVoice APIの料金明細をCSVから読み込んでkintoneのテーブルに表示するプラグイン",
+        "en": "kintone plugin for displaying AmiVoice usage costs from CSV in tables"
+    },
+    "icon": "icon_amivoice.png",
+    "desktop": {
+        "js": [
+            "js/main.js"
+        ]
+    }
+}

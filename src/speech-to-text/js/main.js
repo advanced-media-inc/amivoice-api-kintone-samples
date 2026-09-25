@@ -46,13 +46,14 @@
         return String(value || '').trim();
     }
 
+    // AmiVoiceが受け付けるのはWAV/Ogg/MP3/FLAC/WebM(Opus)とヘッダーなしPCMのみ（m4a/aacは非対応）
     function guessMimeType(fileName) {
         const lower = String(fileName || '').toLowerCase();
         if (lower.endsWith('.wav')) return 'audio/wav';
         if (lower.endsWith('.mp3')) return 'audio/mpeg';
-        if (lower.endsWith('.m4a')) return 'audio/mp4';
-        if (lower.endsWith('.aac')) return 'audio/aac';
         if (lower.endsWith('.flac')) return 'audio/flac';
+        if (lower.endsWith('.ogg')) return 'audio/ogg';
+        if (lower.endsWith('.webm')) return 'audio/webm';
         return 'application/octet-stream';
     }
 
@@ -148,6 +149,32 @@
                 }, timeoutMs);
             })
         ]);
+    }
+
+    // 同期HTTPは音声(a)を最終パートに置いたマルチパートPOSTのみ対応のため、bodyを手組みする
+    function buildMultipartFormData(fields, boundary) {
+        const CRLF = '\r\n';
+        const blobParts = [];
+
+        fields.forEach(function (field) {
+            let header = '--' + boundary + CRLF +
+                'Content-Disposition: form-data; name="' + field.name + '"';
+            if (field.fileName) {
+                header += '; filename="' + field.fileName + '"';
+            }
+            header += CRLF;
+            if (field.contentType) {
+                header += 'Content-Type: ' + field.contentType + CRLF;
+            }
+            header += CRLF;
+
+            blobParts.push(header);
+            blobParts.push(field.value);
+            blobParts.push(CRLF);
+        });
+        blobParts.push('--' + boundary + '--' + CRLF);
+
+        return new Blob(blobParts);
     }
 
     async function downloadKintoneFileBlob(fileKey, timeoutMs) {
@@ -316,31 +343,47 @@
             const fileName = audioFile[0].name;
             const contentType = audioFile[0].contentType || guessMimeType(fileName);
             const blob = await downloadKintoneFileBlob(fileKey, 60000);
-            const dParams = [resolveEngineParam(record)];
+
+            // 複数パラメータを渡す場合はキー付きで指定する（例: grammarFileNames=-a-general）
+            const dParams = ['grammarFileNames=' + resolveEngineParam(record)];
+            const profileId = extractFieldStringValue(record.profile_id);
+            if (profileId) {
+                // profileIdは先頭に「:」を付けないと、セッション終了時にプロファイルの内容が上書きされてしまう
+                dParams.push('profileId=:' + profileId);
+            }
             const billingKey = extractFieldStringValue(record.billing_key);
             if (billingKey) {
-                dParams.push('extension=' + JSON.stringify({
+                // <キー>=<値>の<値>部分のみをURLエンコードする
+                dParams.push('extension=' + encodeURIComponent(JSON.stringify({
                     client_info: {
                         billing_key: billingKey
                     }
-                }));
+                })));
             }
             const dParam = dParams.join(' ');
-            const endpoint =
-                'https://acp-api.amivoice.com/v1/recognize' +
-                '?u=' + encodeURIComponent(config.amivoiceApiKey) +
-                '&d=' + encodeURIComponent(dParam);
+            const endpoint = 'https://acp-api.amivoice.com/v1/recognize';
+
+            // 音声(a)は最終パートに置くマルチパートPOSTで送信し、APIキーはURLに含めずヘッダーで送る
+            const boundary = 'amivoice-' + Date.now().toString(16) + Math.random().toString(16).slice(2);
+            const multipartBody = buildMultipartFormData(
+                [
+                    { name: 'd', value: dParam },
+                    { name: 'a', value: blob, contentType: contentType, fileName: fileName }
+                ],
+                boundary
+            );
 
             // 送信が固まるケースに備え、タイムアウト付きの送信を使う
             const responseWithTimeout = await proxyUploadWithTimeout(
                 endpoint,
                 'POST',
                 {
-                    'Content-Type': contentType
+                    'Content-Type': 'multipart/form-data; boundary=' + boundary,
+                    'Authorization': 'Bearer ' + config.amivoiceApiKey
                 },
                 {
                     format: 'RAW',
-                    value: blob
+                    value: multipartBody
                 },
                 60000
             );
@@ -350,13 +393,19 @@
                 throw new Error('AmiVoice recognize failed: HTTP ' + statusCode + ' ' + responseBody);
             }
 
-            let resultText = '';
+            let result;
             try {
-                const result = JSON.parse(responseBody);
-                resultText = result.text || resultText;
+                result = JSON.parse(responseBody);
             } catch (e) {
-                resultText = responseBody;
+                throw new Error('AmiVoice recognize failed: invalid response body: ' + responseBody);
             }
+
+            // HTTPステータスが200でも認証エラーや発話なし(o)等はcodeにエラーが入る
+            if (result.code) {
+                throw new Error('AmiVoice recognize failed: code=' + result.code + ' message=' + result.message);
+            }
+
+            const resultText = result.text || '';
 
             const recordToUpdate = {};
             if (hasStatusField) {
