@@ -4,6 +4,7 @@
 
     var API_BASE_URL = 'https://acp.amivoice.com/util/api/downloadusage/';
     var MASK_TEXT = '********';
+    var pendingApiKey = null;
 
     function fieldValue(record, fieldCode) {
         var field = record && record[fieldCode];
@@ -149,17 +150,15 @@
         }
     }
 
-    // 保存直後にCSVを取得し、テーブル更新とAPIキーの消去を1回のPUTで行う。
-    async function processUsageAfterSave(appId, recordId, record) {
-        var apiKey = fieldValue(record, 'apikey');
+    // 保存前に退避しておいたAPIキーでCSVを取得し、テーブルのみをPUTで更新する。
+    async function processUsageAfterSave(appId, recordId, record, apiKey) {
         var serviceId = fieldValue(record, 'serviceid');
         var yyyymm = fieldValue(record, 'date');
 
-        var updatePayload = { apikey: { value: '' } };
+        var updatePayload = {};
 
         if (!apiKey || !serviceId || !/^\d{6}$/.test(yyyymm)) {
             window.alert('apikey、serviceid、date（YYYYMM）が未入力のため、料金明細を取得できませんでした。');
-            await updateRecord(appId, recordId, updatePayload);
             return;
         }
 
@@ -189,9 +188,19 @@
         } catch (error) {
             console.error('[AmiVoice cost manager]', error);
             window.alert('料金明細の取得に失敗しました: ' + (error.message || error));
+            return;
         }
 
         await updateRecord(appId, recordId, updatePayload);
+    }
+
+    // レコード変更履歴にAPIキーが残らないよう、保存前にメモリへ退避してフィールドを空にする。
+    function clearApiKeyBeforeSave(event) {
+        pendingApiKey = fieldValue(event.record, 'apikey');
+        if (event.record && event.record.apikey) {
+            event.record.apikey.value = '';
+        }
+        return event;
     }
 
     kintone.events.on('app.record.detail.show', function (event) {
@@ -210,14 +219,23 @@
     });
 
     kintone.events.on([
+        'app.record.create.submit',
+        'app.record.edit.submit'
+    ], clearApiKeyBeforeSave);
+
+    kintone.events.on([
         'app.record.create.submit.success',
         'app.record.edit.submit.success'
     ], function (event) {
-        processUsageAfterSave(kintone.app.getId(), event.recordId, event.record).catch(function (error) {
+        var apiKey = pendingApiKey;
+        pendingApiKey = null;
+        // Promiseを返し、テーブル更新の完了を待ってから詳細画面を表示させる（返さないと保存直後の画面がテーブル未反映のまま表示され、反映には「最新版を表示」が必要になる）
+        return processUsageAfterSave(kintone.app.getId(), event.recordId, event.record, apiKey).catch(function (error) {
             console.error('[AmiVoice cost manager] post-save processing failed', error);
             window.alert('保存後の料金明細取得に失敗しました。詳細はコンソールを確認してください。');
+        }).then(function () {
+            return event;
         });
-        return event;
     });
 }());
 

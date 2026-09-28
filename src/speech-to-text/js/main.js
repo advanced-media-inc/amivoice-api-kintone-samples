@@ -5,6 +5,11 @@
     const QUEUE_KEY = 'amivoice_stt_queue';
     const AUTO_DONE_KEY = 'amivoice_stt_auto_done';
     const RUNNING_KEY = 'amivoice_stt_running';
+    // 同期HTTPインタフェースで送信できる音声データの最大サイズ
+    const SYNC_HTTP_MAX_AUDIO_BYTES = 16777215;
+    // kintoneの文字列(複数行)の文字数上限。超えるとレコード更新全体が失敗する
+    const MULTI_LINE_TEXT_MAX_LENGTH = 65535;
+    const TRUNCATED_SUFFIX = '\n...(truncated)';
 
     function renderStatusBadge(text, bgColor) {
         const container = kintone.app.record.getHeaderMenuSpaceElement &&
@@ -39,6 +44,13 @@
         if (fieldType === 'SINGLE_LINE_TEXT') {
             return String(value || '').replace(/\r?\n/g, ' / ').slice(0, 1000);
         }
+        if (fieldType === 'MULTI_LINE_TEXT' || fieldType === 'RICH_TEXT') {
+            const text = String(value || '');
+            if (text.length > MULTI_LINE_TEXT_MAX_LENGTH) {
+                return text.slice(0, MULTI_LINE_TEXT_MAX_LENGTH - TRUNCATED_SUFFIX.length) + TRUNCATED_SUFFIX;
+            }
+            return text;
+        }
         return value;
     }
 
@@ -46,13 +58,14 @@
         return String(value || '').trim();
     }
 
+    // AmiVoiceがヘッダーから形式を判別できるのはWAV/Ogg/MP3/FLAC/WebM(Opus)。ヘッダーなしPCMはcパラメータが必要なため非対応
     function guessMimeType(fileName) {
         const lower = String(fileName || '').toLowerCase();
         if (lower.endsWith('.wav')) return 'audio/wav';
         if (lower.endsWith('.mp3')) return 'audio/mpeg';
-        if (lower.endsWith('.m4a')) return 'audio/mp4';
-        if (lower.endsWith('.aac')) return 'audio/aac';
         if (lower.endsWith('.flac')) return 'audio/flac';
+        if (lower.endsWith('.ogg')) return 'audio/ogg';
+        if (lower.endsWith('.webm')) return 'audio/webm';
         return 'application/octet-stream';
     }
 
@@ -66,76 +79,54 @@
         return String(field.value || '').trim();
     }
 
+    // 選択肢の表示名(空白除去・小文字化後)と完全一致した場合だけ接続エンジン名に変換する
+    const ENGINE_MAP = {
+        '会話汎用': '-a-general',
+        '英語汎用': '-a-general-en',
+        '医療': '-a-medical',
+        'e2e日本語_速度優先': '-a2-ja-general',
+        'e2e多言語_速度優先': '-a2-multi-general',
+        'e2e日本語_精度優先': '-a2b-ja-general',
+        'e2e多言語_精度優先': '-a2b-multi-general',
+        '-a-general': '-a-general',
+        '-a-general-en': '-a-general-en',
+        '-a-medical': '-a-medical',
+        '-a2-ja-general': '-a2-ja-general',
+        '-a2-multi-general': '-a2-multi-general',
+        '-a2b-ja-general': '-a2b-ja-general',
+        '-a2b-multi-general': '-a2b-multi-general'
+    };
+
+    function mapEngineValue(rawValue) {
+        const normalized = String(rawValue || '').replace(/\s+/g, '').toLowerCase();
+        return Object.prototype.hasOwnProperty.call(ENGINE_MAP, normalized) ? ENGINE_MAP[normalized] : '';
+    }
+
     function resolveEngineParam(record) {
-        const engineMap = {
-            '会話汎用': '-a-general',
-            '英語汎用': '-a-general-en',
-            '医療': '-a-medical',
-            'e2e日本語_速度優先': '-a2-ja-general',
-            'e2e多言語_速度優先': '-a2-multi-general',
-            'e2e日本語_精度優先': '-a2b-ja-general',
-            'e2e多言語_精度優先': '-a2b-multi-general',
-            '-a-general': '-a-general',
-            '-a-general-en': '-a-general-en',
-            '-a-medical': '-a-medical',
-            '-a2-ja-general': '-a2-ja-general',
-            '-a2-multi-general': '-a2-multi-general',
-            '-a2b-ja-general': '-a2b-ja-general',
-            '-a2b-multi-general': '-a2b-multi-general'
-        };
+        // テンプレートのエンジン選択欄はフィールドコードがengine_selectionではないため、なければ選択系フィールドを候補にする
+        const candidateCodes = record.engine_selection
+            ? ['engine_selection']
+            : Object.keys(record).filter(function (fieldCode) {
+                const type = record[fieldCode] && record[fieldCode].type;
+                return type === 'DROP_DOWN' || type === 'RADIO_BUTTON';
+            });
 
-        function mapEngineValue(rawValue) {
-            const engineValue = String(rawValue || '').trim();
-            const normalized = engineValue.replace(/\s+/g, '').toLowerCase();
-
-            if (engineMap[engineValue]) {
-                return engineMap[engineValue];
+        const unmatchedValues = [];
+        for (let i = 0; i < candidateCodes.length; i += 1) {
+            const value = extractFieldStringValue(record[candidateCodes[i]]);
+            if (!value) {
+                continue;
             }
-            if (engineMap[normalized]) {
-                return engineMap[normalized];
+            const engine = mapEngineValue(value);
+            if (engine) {
+                return engine;
             }
-            if (normalized.indexOf('医療') >= 0 || normalized.indexOf('medical') >= 0) {
-                return '-a-medical';
-            }
-            if (normalized.indexOf('英語汎用') >= 0 || normalized.indexOf('english') >= 0 || normalized.indexOf('general-en') >= 0) {
-                return '-a-general-en';
-            }
-            if (normalized.indexOf('e2e日本語_精度優先') >= 0 || normalized.indexOf('e2e日本語精度優先') >= 0 || normalized.indexOf('a2b-ja-general') >= 0) {
-                return '-a2b-ja-general';
-            }
-            if (normalized.indexOf('e2e多言語_精度優先') >= 0 || normalized.indexOf('e2e多言語精度優先') >= 0 || normalized.indexOf('a2b-multi-general') >= 0) {
-                return '-a2b-multi-general';
-            }
-            if (normalized.indexOf('e2e日本語_速度優先') >= 0 || normalized.indexOf('e2e日本語速度優先') >= 0 || normalized.indexOf('a2-ja-general') >= 0) {
-                return '-a2-ja-general';
-            }
-            if (normalized.indexOf('e2e多言語_速度優先') >= 0 || normalized.indexOf('e2e多言語速度優先') >= 0 || normalized.indexOf('a2-multi-general') >= 0) {
-                return '-a2-multi-general';
-            }
-            if (normalized.indexOf('会話汎用') >= 0 || normalized.indexOf('general') >= 0) {
-                return '-a-general';
-            }
-
-            return '';
+            unmatchedValues.push(value);
         }
 
-        const directMatch = mapEngineValue(extractFieldStringValue(record.engine_selection));
-        if (directMatch) {
-            return directMatch;
+        if (unmatchedValues.length > 0) {
+            throw new Error('認識エンジンを特定できません。エンジン選択の選択肢が対応表と一致しているか確認してください: ' + unmatchedValues.join(', '));
         }
-
-        const detectedFieldCode = Object.keys(record || {}).find(function (fieldCode) {
-            const field = record[fieldCode];
-            if (!field) {
-                return false;
-            }
-            return !!mapEngineValue(extractFieldStringValue(field));
-        });
-
-        if (detectedFieldCode) {
-            return mapEngineValue(extractFieldStringValue(record[detectedFieldCode]));
-        }
-
         return '-a-general';
     }
 
@@ -148,6 +139,33 @@
                 }, timeoutMs);
             })
         ]);
+    }
+
+    // 同期HTTPは音声(a)を最終パートに置いたマルチパートPOSTのみ対応のため、bodyを手組みする
+    function buildMultipartFormData(fields, boundary) {
+        const CRLF = '\r\n';
+        const blobParts = [];
+
+        fields.forEach(function (field) {
+            let header = '--' + boundary + CRLF +
+                'Content-Disposition: form-data; name="' + field.name + '"';
+            if (field.fileName) {
+                // 添付ファイル名の「"」「\」や改行がヘッダーを壊さないよう置換する
+                header += '; filename="' + String(field.fileName).replace(/["\\\r\n]/g, '_') + '"';
+            }
+            header += CRLF;
+            if (field.contentType) {
+                header += 'Content-Type: ' + field.contentType + CRLF;
+            }
+            header += CRLF;
+
+            blobParts.push(header);
+            blobParts.push(field.value);
+            blobParts.push(CRLF);
+        });
+        blobParts.push('--' + boundary + '--' + CRLF);
+
+        return new Blob(blobParts);
     }
 
     async function downloadKintoneFileBlob(fileKey, timeoutMs) {
@@ -198,6 +216,11 @@
             }
         }
 
+        // catch節でも自動判定後の出力先へ書き込めるよう、tryの外で保持する
+        let loadedRecord = null;
+        let errorResponseFieldCode = normalizeFieldCode(config.responseFieldCode);
+        let errorStatusFieldCode = normalizeFieldCode(config.statusFieldCode);
+
         try {
             if (!config.amivoiceApiKey) {
                 renderStatusBadge('AmiVoice: API key missing', '#d84315');
@@ -244,6 +267,9 @@
             const hasStatusField = !!statusFieldCode;
             const hasResultField = !!resultFieldCode;
             const hasPostResponseField = !!responseFieldCode;
+            loadedRecord = record;
+            errorResponseFieldCode = responseFieldCode;
+            errorStatusFieldCode = statusFieldCode;
 
             const configuredAudioFieldCode = normalizeFieldCode(config.audioFieldCode) || 'audio_file';
             let usedAudioFieldCode = configuredAudioFieldCode;
@@ -315,32 +341,56 @@
             const fileKey = audioFile[0].fileKey;
             const fileName = audioFile[0].name;
             const contentType = audioFile[0].contentType || guessMimeType(fileName);
-            const blob = await downloadKintoneFileBlob(fileKey, 60000);
-            const dParams = [resolveEngineParam(record)];
+            const fileSize = Number(audioFile[0].size);
+            if (fileSize > SYNC_HTTP_MAX_AUDIO_BYTES) {
+                throw new Error('音声ファイルが同期HTTPの上限（16,777,215バイト）を超えています: ' + fileSize + 'バイト');
+            }
+
+            // 複数パラメータを渡す場合はキー付きで指定する（例: grammarFileNames=-a-general）
+            const dParams = ['grammarFileNames=' + resolveEngineParam(record)];
+            const profileId = extractFieldStringValue(record.profile_id);
+            if (profileId) {
+                // スペース等が混じるとdパラメータが壊れるため、仕様上使える文字だけを許可する（__始まりは予約済み）
+                if (!/^[A-Za-z0-9_-]+$/.test(profileId) || profileId.indexOf('__') === 0) {
+                    throw new Error('profile_idは半角英数字、-、_だけで入力してください（__で始まるIDは使用できません）: ' + profileId);
+                }
+                // profileIdは先頭に「:」を付けないと、セッション終了時にプロファイルの内容が上書きされてしまう
+                dParams.push('profileId=:' + profileId);
+            }
             const billingKey = extractFieldStringValue(record.billing_key);
             if (billingKey) {
-                dParams.push('extension=' + JSON.stringify({
+                // <キー>=<値>の<値>部分のみをURLエンコードする
+                dParams.push('extension=' + encodeURIComponent(JSON.stringify({
                     client_info: {
                         billing_key: billingKey
                     }
-                }));
+                })));
             }
             const dParam = dParams.join(' ');
-            const endpoint =
-                'https://acp-api.amivoice.com/v1/recognize' +
-                '?u=' + encodeURIComponent(config.amivoiceApiKey) +
-                '&d=' + encodeURIComponent(dParam);
+            const endpoint = 'https://acp-api.amivoice.com/v1/recognize';
+            const blob = await downloadKintoneFileBlob(fileKey, 60000);
+
+            // 音声(a)は最終パートに置くマルチパートPOSTで送信し、APIキーはURLに含めずヘッダーで送る
+            const boundary = 'amivoice-' + Date.now().toString(16) + Math.random().toString(16).slice(2);
+            const multipartBody = buildMultipartFormData(
+                [
+                    { name: 'd', value: dParam },
+                    { name: 'a', value: blob, contentType: contentType, fileName: fileName }
+                ],
+                boundary
+            );
 
             // 送信が固まるケースに備え、タイムアウト付きの送信を使う
             const responseWithTimeout = await proxyUploadWithTimeout(
                 endpoint,
                 'POST',
                 {
-                    'Content-Type': contentType
+                    'Content-Type': 'multipart/form-data; boundary=' + boundary,
+                    'Authorization': 'Bearer ' + config.amivoiceApiKey
                 },
                 {
                     format: 'RAW',
-                    value: blob
+                    value: multipartBody
                 },
                 60000
             );
@@ -350,13 +400,19 @@
                 throw new Error('AmiVoice recognize failed: HTTP ' + statusCode + ' ' + responseBody);
             }
 
-            let resultText = '';
+            let result;
             try {
-                const result = JSON.parse(responseBody);
-                resultText = result.text || resultText;
+                result = JSON.parse(responseBody);
             } catch (e) {
-                resultText = responseBody;
+                throw new Error('AmiVoice recognize failed: invalid response body: ' + responseBody);
             }
+
+            // HTTPステータスが200でも認証エラーや発話なし(o)等はcodeにエラーが入る
+            if (result.code) {
+                throw new Error('AmiVoice recognize failed: code=' + result.code + ' message=' + result.message);
+            }
+
+            const resultText = result.text || '';
 
             const recordToUpdate = {};
             if (hasStatusField) {
@@ -395,10 +451,14 @@
             const message = error && error.message ? error.message : String(error);
             try {
                 const errorRecord = {};
-                const responseFieldCode = normalizeFieldCode(config.responseFieldCode);
-                if (responseFieldCode) {
-                    errorRecord[responseFieldCode] = {
-                        value: 'ERROR: ' + message
+                if (errorResponseFieldCode) {
+                    errorRecord[errorResponseFieldCode] = {
+                        value: toFieldValue(loadedRecord || {}, errorResponseFieldCode, 'ERROR: ' + message)
+                    };
+                }
+                if (errorStatusFieldCode) {
+                    errorRecord[errorStatusFieldCode] = {
+                        value: 'エラー'
                     };
                 }
                 await safePutRecord(errorRecord);
@@ -434,6 +494,20 @@
         return textFields.some(function (fieldCode) {
             const val = record[fieldCode].value;
             return typeof val === 'string' && val.indexOf('STATUS: ') === 0;
+        });
+    }
+
+    // クライアントエラー(o, -, %等)は再送しても同じ結果になるため、失敗済みのレコードは保存し直すまで自動実行しない
+    function hasErrorResult(record) {
+        if (!record) {
+            return false;
+        }
+        return Object.keys(record).some(function (fieldCode) {
+            const field = record[fieldCode];
+            return field &&
+                (field.type === 'MULTI_LINE_TEXT' || field.type === 'SINGLE_LINE_TEXT') &&
+                typeof field.value === 'string' &&
+                field.value.indexOf('ERROR: ') === 0;
         });
     }
 
@@ -524,11 +598,6 @@
                                 const ok = await processSpeechToText(appId, recordId);
                                 if (ok) {
                                     setAutoDone(appId, recordId);
-                                } else {
-                                    sessionStorage.setItem(
-                                        QUEUE_KEY,
-                                        JSON.stringify({ appId: appId, recordId: String(recordId), queuedAt: Date.now() })
-                                    );
                                 }
                             } finally {
                                 clearRunning(appId, recordId);
@@ -546,6 +615,7 @@
                         recordId &&
                         hasAnyAttachedFile(record) &&
                         !hasRecognitionResult(record) &&
+                        !hasErrorResult(record) &&
                         !wasAutoDoneRecently(appId, recordId) &&
                         !isRunningRecently(appId, recordId)
                     ) {

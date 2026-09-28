@@ -7,10 +7,12 @@
         apiKey: 'api_key',
         engine: 'engine_name',
         profileId: 'profile_id',
+        sampleRate: 'sample_rate',
         table: 'word_table',
         written: 'word_written',
         spoken: 'word_reading',
-        className: 'word_class'
+        className: 'word_class',
+        biasing: 'word_biasing'
     };
     var ENGINE_MAP = {
         '日本語E2E_汎用': '-a2-ja-general',
@@ -22,9 +24,12 @@
         '会話_汎用': '-a-general',
         '会話_医療': '-a-medical',
         '会話_金融': '-a-bizfinance',
-        '会話_保険': '-a-bizinsurance',
-        '英語_汎用': '-a-general-en'
+        '会話_保険': '-a-bizinsurance'
     };
+    // word_class(DROP_DOWN)の選択肢と一致しない値を渡すとkintoneがエラーにするため、既知の選択肢だけを通す
+    var CLASS_NAME_CHOICES = [
+        '固有名詞', '名前', '名前(名)', '駅名', '地名', '会社名', '部署名', '役職名', '記号', '括弧開き', '括弧閉じ', '元号'
+    ];
     var PROFILE_SELECT_ID = 'amivoice-profile-id-select';
     var STATUS_ID = 'amivoice-word-register-status';
 
@@ -57,12 +62,25 @@
         return ENGINE_MAP[displayName] || displayName;
     }
 
+    function isE2eEngine(record) {
+        return /^-a2/.test(getEngine(record));
+    }
+
     function getApiKey(record) {
         return fieldValue(record, FIELD.apiKey);
     }
 
     function getProfileId(record) {
         return fieldValue(record, FIELD.profileId);
+    }
+
+    // ハイブリッドエンジンは8k/16kでプロファイルが別物のため、未指定時のデフォルト(16k)以外はadfを付ける
+    function withAdfQuery(path, record) {
+        if (isE2eEngine(record)) {
+            return path;
+        }
+        var sampleRate = fieldValue(record, FIELD.sampleRate);
+        return sampleRate ? path + '?adf=' + encodeURIComponent(sampleRate) : path;
     }
 
     function requestAmiVoice(path, method, apiKey, body) {
@@ -99,6 +117,9 @@
         if (!getEngine(record)) {
             throw new Error('登録先エンジンを選択してください。');
         }
+        if (getEngine(record) === '-a-general-en') {
+            throw new Error('英語エンジンはAmiVoiceのユーザー辞書登録に対応していません。');
+        }
         if (requireProfile && !getProfileId(record)) {
             throw new Error('profileIDを入力または選択してください。');
         }
@@ -108,23 +129,15 @@
     }
 
     function extractProfiles(response) {
-        var values = response.profiles || response.profileids || response.profileIds || response;
-        if (!Array.isArray(values)) {
-            return [];
-        }
-        return values.map(function (profile) {
-            if (typeof profile === 'string') {
-                return profile;
-            }
-            return profile.profileid || profile.profileId || profile.id || profile.name || '';
-        }).filter(Boolean);
+        var profileIds = response && response.profileids;
+        return Array.isArray(profileIds) ? profileIds : [];
     }
 
     function readProfiles() {
         var record = getCurrentRecord();
         validateRecord(record, false);
         setStatus('profileIDを取得中...');
-        var path = '/profilewords/' + encodeURIComponent(getEngine(record)) + '/';
+        var path = withAdfQuery('/profilewords/' + encodeURIComponent(getEngine(record)) + '/', record);
         return requestAmiVoice(path, 'GET', getApiKey(record)).then(function (response) {
             var profiles = extractProfiles(response);
             var select = document.getElementById(PROFILE_SELECT_ID);
@@ -146,6 +159,11 @@
         return Array.isArray(response.profilewords) ? response.profilewords : [];
     }
 
+    function sanitizeClassName(classname) {
+        var trimmed = String(classname || '').trim();
+        return CLASS_NAME_CHOICES.indexOf(trimmed) >= 0 ? trimmed : '';
+    }
+
     function tableRowsFromWords(words) {
         return words.map(function (word) {
             var row = {};
@@ -159,7 +177,11 @@
             };
             row[FIELD.className] = {
                 type: 'DROP_DOWN',
-                value: word.classname || ''
+                value: sanitizeClassName(word.classname)
+            };
+            row[FIELD.biasing] = {
+                type: 'SINGLE_LINE_TEXT',
+                value: word.biasing != null ? String(word.biasing) : ''
             };
             return { value: row };
         });
@@ -169,7 +191,7 @@
         var record = getCurrentRecord();
         validateRecord(record, true);
         setStatus('登録単語を取得中...');
-        var path = '/profilewords/' + encodeURIComponent(getEngine(record)) + '/' + encodeURIComponent(getProfileId(record));
+        var path = withAdfQuery('/profilewords/' + encodeURIComponent(getEngine(record)) + '/' + encodeURIComponent(getProfileId(record)), record);
         return requestAmiVoice(path, 'GET', getApiKey(record)).then(function (response) {
             var currentRecord = getCurrentRecord();
             if (currentRecord && currentRecord[FIELD.table]) {
@@ -182,21 +204,36 @@
 
     function wordsFromRecord(record) {
         var table = record && record[FIELD.table] ? record[FIELD.table].value : [];
+        var isE2E = isE2eEngine(record);
         return table.map(function (row) {
             var values = row.value || {};
             var written = fieldValue(values, FIELD.written);
             var spoken = fieldValue(values, FIELD.spoken);
             var className = fieldValue(values, FIELD.className);
-            if (!written && !spoken && !className) {
+            var biasingText = fieldValue(values, FIELD.biasing);
+            if (!written && !spoken && !className && !biasingText) {
                 return null;
             }
-            if (!written || !spoken) {
-                throw new Error('表記と読みは両方入力してください。');
-            }
             var word;
-            if (/^-a2/.test(getEngine(record))) {
-                word = { written: written, alternativewritten: spoken };
+            if (isE2E) {
+                if (!written) {
+                    throw new Error('表記を入力してください。');
+                }
+                word = { written: written };
+                if (spoken) {
+                    word.alternativewritten = spoken;
+                }
+                if (biasingText) {
+                    var biasing = Number(biasingText);
+                    if (Number.isNaN(biasing) || biasing < 0 || biasing > 1) {
+                        throw new Error('単語強調度は0から1の数値で入力してください。');
+                    }
+                    word.biasing = biasing;
+                }
             } else {
+                if (!written || !spoken) {
+                    throw new Error('表記と読みは両方入力してください。');
+                }
                 word = { written: written, spoken: spoken };
                 if (className) {
                     word.classname = className;
@@ -210,7 +247,14 @@
         var record = getCurrentRecord();
         validateRecord(record, true);
         var words = wordsFromRecord(record);
-        var path = '/profilewords/' + encodeURIComponent(getEngine(record)) + '/' + encodeURIComponent(getProfileId(record));
+        // 登録APIは辞書全体を置き換えるため、0件で送ると登録済みの単語がすべて消える
+        if (words.length === 0 && !window.confirm(
+            '登録する単語が0件です。\nprofileID「' + getProfileId(record) + '」に登録済みの単語はすべて削除されます。よろしいですか？'
+        )) {
+            setStatus('登録を中止しました。');
+            return;
+        }
+        var path = withAdfQuery('/profilewords/' + encodeURIComponent(getEngine(record)) + '/' + encodeURIComponent(getProfileId(record)), record);
         setStatus(words.length + '件を登録中...');
         return requestAmiVoice(path, 'POST', getApiKey(record), { profilewords: words }).then(function () {
             setStatus(words.length + '件を登録しました。');
@@ -261,8 +305,23 @@
         fieldElement.appendChild(notice);
     }
 
+    function usePasswordInputForApiKey(retryCount) {
+        var fieldElement = kintone.app.record.getFieldElement(FIELD.apiKey);
+        var input = fieldElement && fieldElement.querySelector('input');
+        if (input) {
+            input.type = 'password';
+            return;
+        }
+        if ((retryCount || 0) < 5) {
+            window.setTimeout(function () {
+                usePasswordInputForApiKey((retryCount || 0) + 1);
+            }, 100);
+        }
+    }
+
     function addUi(event) {
         addApiKeyNotice();
+        usePasswordInputForApiKey();
         var container = kintone.app.record.getHeaderMenuSpaceElement();
         if (!container || document.getElementById(STATUS_ID)) {
             return event;
