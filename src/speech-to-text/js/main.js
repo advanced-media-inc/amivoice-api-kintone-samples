@@ -160,7 +160,8 @@
             let header = '--' + boundary + CRLF +
                 'Content-Disposition: form-data; name="' + field.name + '"';
             if (field.fileName) {
-                header += '; filename="' + field.fileName + '"';
+                // 添付ファイル名の「"」「\」や改行がヘッダーを壊さないよう置換する
+                header += '; filename="' + String(field.fileName).replace(/["\\\r\n]/g, '_') + '"';
             }
             header += CRLF;
             if (field.contentType) {
