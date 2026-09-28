@@ -71,10 +71,42 @@
         input.insertAdjacentElement('afterend', button);
     }
 
+    function getApiKeyValue(record) {
+        for (var i = 0; i < FIELD_CODES.length; i += 1) {
+            var field = record && record[FIELD_CODES[i]];
+            var value = field && field.value != null ? String(field.value).trim() : '';
+            if (value) return value;
+        }
+        return '';
+    }
+
+    // 詳細画面にはinputもラベル起点で特定できる値要素も無いため、レコードの値と一致するテキストを直接伏せ字にする
+    function maskTextNodesByValue(value, retryCount) {
+        var walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+        var masked = false;
+        var node;
+        while ((node = walker.nextNode())) {
+            if (node.nodeValue.trim() === value) {
+                node.nodeValue = node.nodeValue.replace(/\S/g, '*');
+                masked = true;
+            }
+        }
+        if (!masked && (retryCount || 0) < 5) {
+            window.setTimeout(function () {
+                maskTextNodesByValue(value, (retryCount || 0) + 1);
+            }, 100);
+        }
+    }
+
     kintone.events.on(['app.record.detail.show'], function (event) {
         var targetElement = findApiKeyFieldElement();
         if (targetElement && targetElement.innerText && targetElement.innerText.trim() !== '') {
             targetElement.innerText = targetElement.innerText.replace(/./g, '*');
+            return event;
+        }
+        var apiKey = getApiKeyValue(event.record);
+        if (apiKey) {
+            maskTextNodesByValue(apiKey);
         }
         return event;
     });

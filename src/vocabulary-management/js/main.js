@@ -247,6 +247,13 @@
         var record = getCurrentRecord();
         validateRecord(record, true);
         var words = wordsFromRecord(record);
+        // 登録APIは辞書全体を置き換えるため、0件で送ると登録済みの単語がすべて消える
+        if (words.length === 0 && !window.confirm(
+            '登録する単語が0件です。\nprofileID「' + getProfileId(record) + '」に登録済みの単語はすべて削除されます。よろしいですか？'
+        )) {
+            setStatus('登録を中止しました。');
+            return;
+        }
         var path = withAdfQuery('/profilewords/' + encodeURIComponent(getEngine(record)) + '/' + encodeURIComponent(getProfileId(record)), record);
         setStatus(words.length + '件を登録中...');
         return requestAmiVoice(path, 'POST', getApiKey(record), { profilewords: words }).then(function () {
