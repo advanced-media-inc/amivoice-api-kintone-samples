@@ -298,8 +298,23 @@
         fieldElement.appendChild(notice);
     }
 
+    function usePasswordInputForApiKey(retryCount) {
+        var fieldElement = kintone.app.record.getFieldElement(FIELD.apiKey);
+        var input = fieldElement && fieldElement.querySelector('input');
+        if (input) {
+            input.type = 'password';
+            return;
+        }
+        if ((retryCount || 0) < 5) {
+            window.setTimeout(function () {
+                usePasswordInputForApiKey((retryCount || 0) + 1);
+            }, 100);
+        }
+    }
+
     function addUi(event) {
         addApiKeyNotice();
+        usePasswordInputForApiKey();
         var container = kintone.app.record.getHeaderMenuSpaceElement();
         if (!container || document.getElementById(STATUS_ID)) {
             return event;
