@@ -1,0 +1,19 @@
+{
+    "manifest_version": 1,
+    "version": "1.0.0",
+    "type": "APP",
+    "name": {
+        "ja": "AmiVoice ユーザー辞書登録",
+        "en": "AmiVoice User Dictionary"
+    },
+    "description": {
+        "ja": "AmiVoice API のユーザー辞書をkintoneから管理するプラグイン",
+        "en": "kintone plugin for managing AmiVoice user dictionaries"
+    },
+    "icon": "icon_amivoice.png",
+    "desktop": {
+        "js": [
+            "js/main.js"
+        ]
+    }
+}

@@ -1,8 +1,9 @@
 <div style="padding:16px;">
     <h2>AmiVoice STT ノード設定</h2>
 
-    <label>AmiVoice API Key</label><br>
-    <input type="password" id="amivoiceApiKey" style="width:100%;"><br><br>
+    <label for="amivoiceApiKey">AmiVoice API Key</label><br>
+    <input type="password" id="amivoiceApiKey" autocomplete="new-password" style="width:100%;"><br>
+    <small id="apiKeyStatus"></small><br><br>
 
     <button id="save" class="kintone-plugin-button-normal">保存</button>
     <button id="cancel" class="kintone-plugin-button-dialog-cancel">キャンセル</button>

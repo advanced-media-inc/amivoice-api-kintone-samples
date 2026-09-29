@@ -2,6 +2,8 @@
     'use strict';
     const PLUGIN_ID = kintone.$PLUGIN_ID;
     const config = kintone.plugin.app.getConfig(PLUGIN_ID);
+    // APIキー自体はsetProxyConfigにあり画面側からは読めないため、設定済みかどうかだけを見る
+    const HAS_API_KEY = config.apiKeyConfigured === 'true';
     const QUEUE_KEY = 'amivoice_stt_queue';
     const AUTO_DONE_KEY = 'amivoice_stt_auto_done';
     const RUNNING_KEY = 'amivoice_stt_running';
@@ -132,7 +134,7 @@
 
     async function proxyUploadWithTimeout(url, method, headers, data, timeoutMs) {
         return Promise.race([
-            kintone.proxy.upload(url, method, headers, data),
+            kintone.plugin.app.proxy.upload(PLUGIN_ID, url, method, headers, data),
             new Promise(function (_, reject) {
                 setTimeout(function () {
                     reject(new Error('AmiVoice upload timeout (' + timeoutMs + 'ms)'));
@@ -222,7 +224,7 @@
         let errorStatusFieldCode = normalizeFieldCode(config.statusFieldCode);
 
         try {
-            if (!config.amivoiceApiKey) {
+            if (!HAS_API_KEY) {
                 renderStatusBadge('AmiVoice: API key missing', '#d84315');
                 return false;
             }
@@ -370,7 +372,7 @@
             const endpoint = 'https://acp-api.amivoice.com/v1/recognize';
             const blob = await downloadKintoneFileBlob(fileKey, 60000);
 
-            // 音声(a)は最終パートに置くマルチパートPOSTで送信し、APIキーはURLに含めずヘッダーで送る
+            // 音声(a)は最終パートに置くマルチパートPOSTで送信する。AuthorizationヘッダーはsetProxyConfigの保存内容をkintoneが付加する
             const boundary = 'amivoice-' + Date.now().toString(16) + Math.random().toString(16).slice(2);
             const multipartBody = buildMultipartFormData(
                 [
@@ -385,8 +387,7 @@
                 endpoint,
                 'POST',
                 {
-                    'Content-Type': 'multipart/form-data; boundary=' + boundary,
-                    'Authorization': 'Bearer ' + config.amivoiceApiKey
+                    'Content-Type': 'multipart/form-data; boundary=' + boundary
                 },
                 {
                     format: 'RAW',
@@ -574,7 +575,7 @@
         ],
         async function (event) {
             window.__amivoicePluginLoaded = true;
-            const hasKey = !!config.amivoiceApiKey;
+            const hasKey = HAS_API_KEY;
             const message = hasKey
                 ? 'AmiVoice plugin loaded (API key configured)'
                 : 'AmiVoice plugin loaded (API key missing)';
@@ -645,7 +646,7 @@
             const appId = kintone.app.getId();
             const recordId = event.recordId || (event.record && event.record.$id && event.record.$id.value);
 
-            if (!config.amivoiceApiKey) {
+            if (!HAS_API_KEY) {
                 renderStatusBadge('AmiVoice: API key missing', '#d84315');
                 return event;
             }
