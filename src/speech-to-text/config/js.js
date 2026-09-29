@@ -2,13 +2,13 @@
     'use strict';
 
     var PLUGIN_ID = kintone.$PLUGIN_ID;
-    // main.jsの送信先と同じURLにする。setProxyConfigの設定はURLの前方一致で適用される
-    var RECOGNIZE_URL = 'https://acp-api.amivoice.com/v1/recognize';
+    // setProxyConfigの設定はURLの前方一致で適用される。ログ保存あり(/v1/recognize)・なし(/v1/nolog/recognize)の両方に一致させる
+    var PROXY_URL_PREFIX = 'https://acp-api.amivoice.com/v1/';
     var config = kintone.plugin.app.getConfig(PLUGIN_ID);
     // 旧版はAPIキーをsetConfigに平文で保存していた。getConfigはアプリの利用者も呼べるため、保存時にsetProxyConfigへ移す
     var legacyApiKey = String(config.amivoiceApiKey || '').trim();
     // setConfigのフラグだけでなく、プロキシ設定にキーが実在するかも確かめる（アプリの再利用などで食い違った場合に入力を求めるため）
-    var proxyConfig = kintone.plugin.app.getProxyConfig(RECOGNIZE_URL, 'POST');
+    var proxyConfig = kintone.plugin.app.getProxyConfig(PROXY_URL_PREFIX, 'POST');
     var isConfigured = config.apiKeyConfigured === 'true' &&
         !!(proxyConfig && proxyConfig.headers && proxyConfig.headers.Authorization);
 
@@ -35,7 +35,7 @@
         var apiKey = document.getElementById('amivoiceApiKey').value.trim() || legacyApiKey;
         if (apiKey) {
             // kintoneのプロキシがサーバー側でヘッダーを付けるため、APIキーは利用者のブラウザに渡らない
-            kintone.plugin.app.setProxyConfig(RECOGNIZE_URL, 'POST', {
+            kintone.plugin.app.setProxyConfig(PROXY_URL_PREFIX, 'POST', {
                 Authorization: 'Bearer ' + apiKey
             }, {}, saveConfig);
             return;
