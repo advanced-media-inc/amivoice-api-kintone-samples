@@ -1,0 +1,25 @@
+{
+    "manifest_version": 1,
+    "version": "1.0.0",
+    "type": "APP",
+    "name": {
+        "ja": "AmiVoice STT ノード",
+        "en": "AmiVoice STT Node"
+    },
+    "description": {
+        "ja": "AmiVoice API を使用した音声テキスト化ノード",
+        "en": "kintone node that uses AmiVoice API for speech-to-text"
+    },
+    "icon": "icon_amivoice.png",
+    "desktop": {
+        "js": [
+            "js/main.js"
+        ]
+    },
+    "config": {
+        "html": "config/html.html",
+        "js": [
+            "config/js.js"
+        ]
+    }
+}

@@ -28,8 +28,12 @@
     };
     // word_class(DROP_DOWN)の選択肢と一致しない値を渡すとkintoneがエラーにするため、既知の選択肢だけを通す
     var CLASS_NAME_CHOICES = [
-        '固有名詞', '名前', '名前(名)', '駅名', '地名', '会社名', '部署名', '役職名', '記号', '括弧開き', '括弧閉じ', '元号'
+        '固有名詞', '名前', '名前(名)', '駅名', '地名', '会社名', '部署名', '役職名', '記号', '括弧開き', '括弧閉じ', '元号',
+        '病名', '薬品名', '病院名', '手術名', '地名_区町村', '地名_支庁市郡'
     ];
+    // enginesの「日本語の言語モデルのクラス名一覧」で、会話_医療(医療会議)とそれ以外で使えるクラスが異なる
+    var MEDICAL_ONLY_CLASS_NAMES = ['病名', '薬品名', '病院名', '手術名', '地名_区町村', '地名_支庁市郡'];
+    var NON_MEDICAL_CLASS_NAMES = ['地名'];
     var PROFILE_SELECT_ID = 'amivoice-profile-id-select';
     var STATUS_ID = 'amivoice-word-register-status';
 
@@ -164,6 +168,11 @@
         return CLASS_NAME_CHOICES.indexOf(trimmed) >= 0 ? trimmed : '';
     }
 
+    function isClassNameAvailable(engine, className) {
+        var unavailable = engine === '-a-medical' ? NON_MEDICAL_CLASS_NAMES : MEDICAL_ONLY_CLASS_NAMES;
+        return unavailable.indexOf(className) === -1;
+    }
+
     function tableRowsFromWords(words) {
         return words.map(function (word) {
             var row = {};
@@ -211,7 +220,9 @@
             var spoken = fieldValue(values, FIELD.spoken);
             var className = fieldValue(values, FIELD.className);
             var biasingText = fieldValue(values, FIELD.biasing);
-            if (!written && !spoken && !className && !biasingText) {
+            // エンジンで使わない項目（E2Eのクラス、ハイブリッドの単語強調度）だけが入った行は空行として扱う
+            var hasEngineSpecificValue = isE2E ? !!biasingText : !!className;
+            if (!written && !spoken && !hasEngineSpecificValue) {
                 return null;
             }
             var word;
@@ -235,7 +246,8 @@
                     throw new Error('表記と読みは両方入力してください。');
                 }
                 word = { written: written, spoken: spoken };
-                if (className) {
+                // エンジンで使えないクラスは送らず、クラスなしで登録する
+                if (className && isClassNameAvailable(getEngine(record), className)) {
                     word.classname = className;
                 }
             }

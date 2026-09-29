@@ -8,9 +8,9 @@
 
 | アプリ                                    | 概要                                                                                 | 詳細ガイド                                                                                |
 | ----------------------------------------- | ------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------- |
-| **AmiSimpleES**<br>（Speech to Text）     | kintone レコードに添付した音声ファイルを AmiVoice API で文字起こしする               | [speech-to-text-app_start_quide.md](docs/speech-to-text-app_start_quide.md)               |
-| **AmiCostViewerES**<br>（月次使用量表示） | AmiVoice API の使用量 CSV を取得し、使用量（ミリ秒）と料金（円）を表として表示する   | [monthly-usage-app_start_quide.md](docs/monthly-usage-app_start_quide.md)                 |
-| **AmiWordRegES**<br>（ユーザー辞書登録）  | AmiVoice API のユーザー辞書（プロファイル単語）を kintone 画面から一括登録・編集する | [vocabulary-management-app_start_quide.md](docs/vocabulary-management-app_start_quide.md) |
+| **AmiSimpleES**<br>（Speech to Text）     | kintone レコードに添付した音声ファイルを AmiVoice API で文字起こしする               | [speech-to-text-app_start_guide.md](docs/speech-to-text-app_start_guide.md)               |
+| **AmiCostViewerES**<br>（月次使用量表示） | AmiVoice API の使用量 CSV を取得し、使用量（ミリ秒）と料金（円）を表として表示する   | [monthly-usage-app_start_guide.md](docs/monthly-usage-app_start_guide.md)                 |
+| **AmiWordRegES**<br>（ユーザー辞書登録）  | AmiVoice API のユーザー辞書（プロファイル単語）を kintone 画面から一括登録・編集する | [vocabulary-management-app_start_guide.md](docs/vocabulary-management-app_start_guide.md) |
 
 各アプリは、kintone アプリテンプレート（.zip）とプラグイン（.zip）で構成されます。月次使用量表示とユーザー辞書登録では、さらに共通カスタマイズスクリプト（`ami_maskkey.js`）を利用します。
 
@@ -74,7 +74,7 @@ requirements/                各アプリの要件定義メモ
 
 ## ドキュメント
 
-- [Speech to Text スタートガイド](docs/speech-to-text-app_start_quide.md)、[月次使用量表示スタートガイド](docs/monthly-usage-app_start_quide.md)、[ユーザー辞書登録スタートガイド](docs/vocabulary-management-app_start_quide.md) — 各アプリの導入・操作手順
+- [Speech to Text スタートガイド](docs/speech-to-text-app_start_guide.md)、[月次使用量表示スタートガイド](docs/monthly-usage-app_start_guide.md)、[ユーザー辞書登録スタートガイド](docs/vocabulary-management-app_start_guide.md) — 各アプリの導入・操作手順
 - [requirements/monthly-usage_requirement.md](requirements/monthly-usage_requirement.md) — 月次使用量表示アプリの要件
 - [requirements/vocabulary-management-app_requirements.md](requirements/vocabulary-management-app_requirements.md) — ユーザー辞書登録アプリの要件
 
