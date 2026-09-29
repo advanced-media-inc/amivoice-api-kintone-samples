@@ -89,7 +89,7 @@ APIキーはAmiVoice APIへの接続にだけ使われます。保存操作の�
 ### 4.1 プラグイン（ami_vocab_{version}.zip）の導入
 
 1. kintoneのシステム管理を開きます。
-2. プラグインの管理画面で `ami_vocab_{version}.zip` などkintone用にパッケージされたZIPファイルをインストールします。
+2. プラグインの管理画面で、[リリースページ](https://github.com/advanced-media-inc/amivoice-api-kintone-samples/releases/latest)から取得した `ami_vocab_{version}.zip` などkintone用にパッケージされたZIPファイルをインストールします。
 3. kintoneのアプリ管理画面で対象アプリを開きます。
 4. アプリの設定からプラグインを開き、インストールしたプラグインを対象アプリに追加します。
 5. アプリを更新します。

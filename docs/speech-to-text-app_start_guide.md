@@ -45,7 +45,7 @@
 ### プラグインを追加する
 
 1. kintone のシステム管理またはアプリ設定で「プラグイン」を開きます。
-2. speech-to-text内のプラグインami_stt_xxx.zip ファイルを読み込みます。
+2. [リリースページ](https://github.com/advanced-media-inc/amivoice-api-kintone-samples/releases/latest)から取得した `ami_stt_{version}.zip` ファイルを読み込みます。
 3. 対象アプリのプラグイン一覧で AmiVoice STT Node を追加します。
 4. プラグインを有効にして保存します。
 5. アプリを更新します。

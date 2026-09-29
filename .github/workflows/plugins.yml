@@ -1,0 +1,73 @@
+name: Build kintone plugins
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    if: github.event_name != 'release'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+      - name: Build plugins (verification build, unsigned)
+        run: scripts/build-plugins.sh
+
+  release:
+    if: github.event_name == 'release'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+      - name: Write signing keys
+        env:
+          PLUGIN_PPK_SPEECH_TO_TEXT: ${{ secrets.PLUGIN_PPK_SPEECH_TO_TEXT }}
+          PLUGIN_PPK_MONTHLY_USAGE: ${{ secrets.PLUGIN_PPK_MONTHLY_USAGE }}
+          PLUGIN_PPK_VOCABULARY_MANAGEMENT: ${{ secrets.PLUGIN_PPK_VOCABULARY_MANAGEMENT }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/keys"
+          if [ -z "$PLUGIN_PPK_SPEECH_TO_TEXT" ]; then
+            echo "PLUGIN_PPK_SPEECH_TO_TEXT secret is empty" >&2
+            exit 1
+          fi
+          if [ -z "$PLUGIN_PPK_MONTHLY_USAGE" ]; then
+            echo "PLUGIN_PPK_MONTHLY_USAGE secret is empty" >&2
+            exit 1
+          fi
+          if [ -z "$PLUGIN_PPK_VOCABULARY_MANAGEMENT" ]; then
+            echo "PLUGIN_PPK_VOCABULARY_MANAGEMENT secret is empty" >&2
+            exit 1
+          fi
+          printf '%s\n' "$PLUGIN_PPK_SPEECH_TO_TEXT" > "$RUNNER_TEMP/keys/speech-to-text.ppk"
+          printf '%s\n' "$PLUGIN_PPK_MONTHLY_USAGE" > "$RUNNER_TEMP/keys/monthly-usage.ppk"
+          printf '%s\n' "$PLUGIN_PPK_VOCABULARY_MANAGEMENT" > "$RUNNER_TEMP/keys/vocabulary-management.ppk"
+      - name: Build plugins (signed)
+        run: scripts/build-plugins.sh --keys-dir "$RUNNER_TEMP/keys"
+      - name: Collect release assets
+        run: |
+          set -euo pipefail
+          cp apps/*/*.zip dist/
+          cp JavaScript_customize/ami_maskkey.js dist/
+      - name: Upload release assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: gh release upload "$RELEASE_TAG" dist/* --clobber
+      - name: Remove signing keys
+        if: always()
+        run: rm -rf "$RUNNER_TEMP/keys"
