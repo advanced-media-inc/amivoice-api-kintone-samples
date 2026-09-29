@@ -11,6 +11,18 @@
     const MULTI_LINE_TEXT_MAX_LENGTH = 65535;
     const TRUNCATED_SUFFIX = '\n...(truncated)';
 
+    // APIキーは設定画面でsetProxyConfigに保存され、このスクリプトからは見えない。設定済みかどうかだけをフラグで判定する
+    function isApiKeyConfigured() {
+        return config.apiKeyConfigured === 'true';
+    }
+
+    // 旧版はAPIキーをsetConfigに保存していた。設定画面で保存し直すまでは送信しない
+    function apiKeyMissingMessage() {
+        return config.amivoiceApiKey
+            ? 'AmiVoice: プラグイン設定を開いて保存し直してください'
+            : 'AmiVoice: API key missing';
+    }
+
     function renderStatusBadge(text, bgColor) {
         const container = kintone.app.record.getHeaderMenuSpaceElement &&
             kintone.app.record.getHeaderMenuSpaceElement();
@@ -132,7 +144,7 @@
 
     async function proxyUploadWithTimeout(url, method, headers, data, timeoutMs) {
         return Promise.race([
-            kintone.proxy.upload(url, method, headers, data),
+            kintone.plugin.app.proxy.upload(PLUGIN_ID, url, method, headers, data),
             new Promise(function (_, reject) {
                 setTimeout(function () {
                     reject(new Error('AmiVoice upload timeout (' + timeoutMs + 'ms)'));
@@ -222,8 +234,8 @@
         let errorStatusFieldCode = normalizeFieldCode(config.statusFieldCode);
 
         try {
-            if (!config.amivoiceApiKey) {
-                renderStatusBadge('AmiVoice: API key missing', '#d84315');
+            if (!isApiKeyConfigured()) {
+                renderStatusBadge(apiKeyMissingMessage(), '#d84315');
                 return false;
             }
 
@@ -370,7 +382,7 @@
             const endpoint = 'https://acp-api.amivoice.com/v1/recognize';
             const blob = await downloadKintoneFileBlob(fileKey, 60000);
 
-            // 音声(a)は最終パートに置くマルチパートPOSTで送信し、APIキーはURLに含めずヘッダーで送る
+            // 音声(a)は最終パートに置くマルチパートPOSTで送信する。Authorizationヘッダーは、設定画面でsetProxyConfigに保存したものをkintoneのプロキシが付ける
             const boundary = 'amivoice-' + Date.now().toString(16) + Math.random().toString(16).slice(2);
             const multipartBody = buildMultipartFormData(
                 [
@@ -385,8 +397,7 @@
                 endpoint,
                 'POST',
                 {
-                    'Content-Type': 'multipart/form-data; boundary=' + boundary,
-                    'Authorization': 'Bearer ' + config.amivoiceApiKey
+                    'Content-Type': 'multipart/form-data; boundary=' + boundary
                 },
                 {
                     format: 'RAW',
@@ -574,10 +585,10 @@
         ],
         async function (event) {
             window.__amivoicePluginLoaded = true;
-            const hasKey = !!config.amivoiceApiKey;
+            const hasKey = isApiKeyConfigured();
             const message = hasKey
                 ? 'AmiVoice plugin loaded (API key configured)'
-                : 'AmiVoice plugin loaded (API key missing)';
+                : apiKeyMissingMessage();
             renderStatusBadge(message, hasKey ? '#2e7d32' : '#d84315');
 
             if (event.type === 'app.record.detail.show') {
@@ -645,8 +656,8 @@
             const appId = kintone.app.getId();
             const recordId = event.recordId || (event.record && event.record.$id && event.record.$id.value);
 
-            if (!config.amivoiceApiKey) {
-                renderStatusBadge('AmiVoice: API key missing', '#d84315');
+            if (!isApiKeyConfigured()) {
+                renderStatusBadge(apiKeyMissingMessage(), '#d84315');
                 return event;
             }
 
