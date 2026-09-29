@@ -40,7 +40,7 @@ docs/                       各アプリの導入・操作手順（スタート�
 requirements/                各アプリの要件定義メモ
 ```
 
-プラグイン配布用の zip はリポジトリにコミットせず、GitHub Actions（`.github/workflows/plugins.yml`）でビルドして GitHub Releases に添付します。手元でビルドする場合は `scripts/build-plugins.sh` を使用してください。
+プラグイン配布用の zip はリポジトリにコミットせず、GitHub Actions（`.github/workflows/plugins.yml`）でビルドして GitHub Releases に添付します。手順は [RELEASING.md](RELEASING.md) を参照してください。手元でビルドする場合は `scripts/build-plugins.sh` を使用してください。
 
 ## 各アプリの機能
 
@@ -83,10 +83,7 @@ requirements/                各アプリの要件定義メモ
 
 ## リリース手順（メンテナー向け）
 
-1. 3 つのプラグインの署名鍵を、リポジトリの Actions シークレット `PLUGIN_PPK_SPEECH_TO_TEXT` / `PLUGIN_PPK_MONTHLY_USAGE` / `PLUGIN_PPK_VOCABULARY_MANAGEMENT` にそれぞれ登録します。鍵はリポジトリには含めません。今のプラグインID（kintone 上でのプラグインの同一性）を保つには、既存 zip の署名に使ったものと同じ鍵が必要です。別の鍵で署名するとプラグインIDが変わり、アプリテンプレートからも既存の導入先からも別プラグイン扱いになります。ワークフローはビルド後にプラグインIDを照合し、一致しなければ失敗します。
-2. バージョンを上げるときは、対象プラグインの `src/<dir>/manifest.json` の `version` を変更します。
-3. GitHub でタグ `vX.Y.Z` のリリースを公開すると、ワークフロー（`.github/workflows/plugins.yml`）が各プラグインの zip をビルドし、アプリテンプレートや `ami_maskkey.js` とともにそのリリースに添付します。
-4. ローカルでビルド内容を確認したいときは `scripts/build-plugins.sh`（鍵を指定しない場合は使い捨て鍵で署名する検証用ビルドになります）を実行してください。
+署名鍵の登録、リリースの公開、失敗したときの対処は [RELEASING.md](RELEASING.md) を参照してください。
 
 ## ライセンス
 
