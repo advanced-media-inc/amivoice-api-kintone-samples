@@ -379,6 +379,7 @@
                 })));
             }
             const dParam = dParams.join(' ');
+            // 設定画面(config/js.js)のRECOGNIZE_URLと同じ値にする。違うとsetProxyConfigのAuthorizationヘッダーが付かない
             const endpoint = 'https://acp-api.amivoice.com/v1/recognize';
             const blob = await downloadKintoneFileBlob(fileKey, 60000);
 
