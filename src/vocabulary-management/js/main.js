@@ -173,6 +173,15 @@
         return unavailable.indexOf(className) === -1;
     }
 
+    // word_biasing(DROP_DOWN)の選択肢は0〜1の0.1刻みのため、小数第2位以下を切り捨てて選択肢の表記("0","0.1",…,"1")にそろえる
+    function biasingChoice(biasing) {
+        var number = Number(biasing);
+        if (biasing == null || biasing === '' || !Number.isFinite(number)) {
+            return '';
+        }
+        return String(Math.floor(number * 10) / 10);
+    }
+
     function tableRowsFromWords(words) {
         return words.map(function (word) {
             var row = {};
@@ -189,8 +198,8 @@
                 value: sanitizeClassName(word.classname)
             };
             row[FIELD.biasing] = {
-                type: 'SINGLE_LINE_TEXT',
-                value: word.biasing != null ? String(word.biasing) : ''
+                type: 'DROP_DOWN',
+                value: biasingChoice(word.biasing)
             };
             return { value: row };
         });
