@@ -12,6 +12,14 @@
     // kintoneの文字列(複数行)の文字数上限。超えるとレコード更新全体が失敗する
     const MULTI_LINE_TEXT_MAX_LENGTH = 65535;
     const TRUNCATED_SUFFIX = '\n...(truncated)';
+    const LOG_RETENTION_FIELD_CODE = 'log_retention';
+    const ENGINE_FIELD_CODE = 'engine_selection';
+    // 同期HTTPはエンドポイントでログ保存の有無を切り替える。設定画面のプロキシ設定（/v1/）と前方一致させること
+    const RECOGNIZE_ENDPOINTS = {
+        'ログ保存あり': 'https://acp-api.amivoice.com/v1/recognize',
+        'ログ保存なし': 'https://acp-api.amivoice.com/v1/nolog/recognize'
+    };
+    const DEFAULT_LOG_RETENTION = 'ログ保存あり';
 
     function renderStatusBadge(text, bgColor) {
         const container = kintone.app.record.getHeaderMenuSpaceElement &&
@@ -105,31 +113,26 @@
     }
 
     function resolveEngineParam(record) {
-        // テンプレートのエンジン選択欄はフィールドコードがengine_selectionではないため、なければ選択系フィールドを候補にする
-        const candidateCodes = record.engine_selection
-            ? ['engine_selection']
-            : Object.keys(record).filter(function (fieldCode) {
-                const type = record[fieldCode] && record[fieldCode].type;
-                return type === 'DROP_DOWN' || type === 'RADIO_BUTTON';
-            });
-
-        const unmatchedValues = [];
-        for (let i = 0; i < candidateCodes.length; i += 1) {
-            const value = extractFieldStringValue(record[candidateCodes[i]]);
-            if (!value) {
-                continue;
-            }
-            const engine = mapEngineValue(value);
-            if (engine) {
-                return engine;
-            }
-            unmatchedValues.push(value);
+        if (!record[ENGINE_FIELD_CODE]) {
+            throw new Error('フィールドコード「' + ENGINE_FIELD_CODE + '」のフィールドがアプリにありません。');
         }
-
-        if (unmatchedValues.length > 0) {
-            throw new Error('認識エンジンを特定できません。エンジン選択の選択肢が対応表と一致しているか確認してください: ' + unmatchedValues.join(', '));
+        const value = extractFieldStringValue(record[ENGINE_FIELD_CODE]);
+        if (!value) {
+            throw new Error('認識エンジンが選択されていません。「' + ENGINE_FIELD_CODE + '」で認識エンジンを選択してください。');
         }
-        return '-a-general';
+        const engine = mapEngineValue(value);
+        if (!engine) {
+            throw new Error('認識エンジンを特定できません。エンジン選択の選択肢が対応表と一致しているか確認してください: ' + value);
+        }
+        return engine;
+    }
+
+    function resolveRecognizeEndpoint(record) {
+        const value = extractFieldStringValue(record[LOG_RETENTION_FIELD_CODE]) || DEFAULT_LOG_RETENTION;
+        if (!Object.prototype.hasOwnProperty.call(RECOGNIZE_ENDPOINTS, value)) {
+            throw new Error('ログ保存の選択肢を特定できません。「ログ保存あり」「ログ保存なし」のどちらかにしてください: ' + value);
+        }
+        return RECOGNIZE_ENDPOINTS[value];
     }
 
     async function proxyUploadWithTimeout(url, method, headers, data, timeoutMs) {
@@ -369,7 +372,7 @@
                 })));
             }
             const dParam = dParams.join(' ');
-            const endpoint = 'https://acp-api.amivoice.com/v1/recognize';
+            const endpoint = resolveRecognizeEndpoint(record);
             const blob = await downloadKintoneFileBlob(fileKey, 60000);
 
             // 音声(a)は最終パートに置くマルチパートPOSTで送信する。AuthorizationヘッダーはsetProxyConfigの保存内容をkintoneが付加する
@@ -481,6 +484,20 @@
         });
     }
 
+    // 編集前後で添付ファイルが差し替わったかを判定するための識別子（ファイル名とサイズ）
+    function attachedFileSignature(record) {
+        return Object.keys(record || {}).filter(function (fieldCode) {
+            const field = record[fieldCode];
+            return field && field.type === 'FILE' && Array.isArray(field.value);
+        }).sort().map(function (fieldCode) {
+            return fieldCode + '=' + record[fieldCode].value.map(function (file) {
+                return file.name + ':' + file.size;
+            }).join(',');
+        }).join('|');
+    }
+
+    let attachedFileSignatureAtEdit = null;
+
     function hasRecognitionResult(record) {
         if (!record) {
             return false;
@@ -581,6 +598,10 @@
                 : 'AmiVoice plugin loaded (API key missing)';
             renderStatusBadge(message, hasKey ? '#2e7d32' : '#d84315');
 
+            if (event.type === 'app.record.edit.show') {
+                attachedFileSignatureAtEdit = attachedFileSignature(event.record);
+            }
+
             if (event.type === 'app.record.detail.show') {
                 const rawQueue = sessionStorage.getItem(QUEUE_KEY);
                 if (rawQueue) {
@@ -653,6 +674,16 @@
 
             if (!recordId) {
                 console.error('[AmiVoicePlugin] Record ID is missing on submit.success event');
+                return event;
+            }
+
+            // 認識済みのレコードは音声を差し替えたときだけ認識し直す（手で直した結果の上書きと余分な課金を防ぐ）
+            const record = event.record;
+            const audioReplaced = event.type === 'app.record.edit.submit.success' &&
+                attachedFileSignatureAtEdit !== null &&
+                attachedFileSignature(record) !== attachedFileSignatureAtEdit;
+            attachedFileSignatureAtEdit = null;
+            if (!hasAnyAttachedFile(record) || (hasRecognitionResult(record) && !audioReplaced)) {
                 return event;
             }
 
