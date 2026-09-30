@@ -22,22 +22,25 @@ apps/                       kintoneアプリテンプレート（レコード・
   speech-to-text-app/         AmiSimpleES.zip
   vocabulary-management-app/  AmiWordRegES.zip
 
-plugins/                    kintoneプラグイン本体（配布用zip）
-  monthly-usage/               ami_cost_100.zip
-  speech-to-text/              ami_stt_100.zip
-  vocabulary-management/       ami_vocab_100.zip
-
-src/                        各プラグインのソースコード（プラグイン化前のJavaScript）
-  monthly-usage/js/main.js
-  speech-to-text/js/main.js
-  vocabulary-management/js/main.js
+src/                        各プラグインのソースコード（manifest.json・アイコン・JavaScript）
+  monthly-usage/               manifest.json, icon_amivoice.png, js/main.js
+  speech-to-text/              manifest.json, icon_amivoice.png, js/main.js, config/html.html, config/js.js
+  vocabulary-management/       manifest.json, icon_amivoice.png, js/main.js
 
 JavaScript_customize/
   ami_maskkey.js             APIキー入力欄をマスク表示する共通カスタマイズスクリプト
 
+scripts/
+  build-plugins.sh            src/ からプラグイン配布用zipをビルドするスクリプト
+
+.github/workflows/
+  plugins.yml                 プラグインのビルド確認・GitHub Releasesへの添付を行うワークフロー
+
 docs/                       各アプリの導入・操作手順（スタートガイド）
 requirements/                各アプリの要件定義メモ
 ```
+
+プラグイン配布用の zip はリポジトリにコミットせず、GitHub Actions（`.github/workflows/plugins.yml`）でビルドして GitHub Releases に添付します。手順は [RELEASING.md](RELEASING.md) を参照してください。手元でビルドする場合は `scripts/build-plugins.sh` を使用してください。
 
 ## 各アプリの機能
 
@@ -66,7 +69,7 @@ requirements/                各アプリの要件定義メモ
 ## セットアップ
 
 1. `apps/` 配下の zip をテンプレートとして kintone アプリを作成します。
-2. `plugins/` 配下の対応するプラグイン zip を kintone のプラグイン管理からインストールし、作成したアプリに追加します。
+2. [リリースページ](https://github.com/advanced-media-inc/amivoice-api-kintone-samples/releases/latest) から対応するプラグイン zip（`ami_stt_{version}.zip` など）を取得し、kintone のプラグイン管理からインストールして、作成したアプリに追加します。アプリテンプレート（`apps/*/*.zip`）と `ami_maskkey.js` も同じリリースに添付されています。
 3. `JavaScript_customize/ami_maskkey.js` を対象アプリの「JavaScript / CSS カスタマイズ」に追加します（スコープ: デスクトップ）。
 4. 各アプリのスタートガイド（`docs/`）に従い、フィールド設定・プラグイン設定を行います。
 
@@ -77,6 +80,10 @@ requirements/                各アプリの要件定義メモ
 - [Speech to Text スタートガイド](docs/speech-to-text-app_start_guide.md)、[月次使用量表示スタートガイド](docs/monthly-usage-app_start_guide.md)、[ユーザー辞書登録スタートガイド](docs/vocabulary-management-app_start_guide.md) — 各アプリの導入・操作手順
 - [requirements/monthly-usage_requirement.md](requirements/monthly-usage_requirement.md) — 月次使用量表示アプリの要件
 - [requirements/vocabulary-management-app_requirements.md](requirements/vocabulary-management-app_requirements.md) — ユーザー辞書登録アプリの要件
+
+## リリース手順（メンテナー向け）
+
+署名鍵の登録、リリースの公開、失敗したときの対処は [RELEASING.md](RELEASING.md) を参照してください。
 
 ## ライセンス
 

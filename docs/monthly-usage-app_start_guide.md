@@ -17,7 +17,7 @@
 - AmiVoice API の API キー
 - AmiVoice API のサービス ID
 - 取得対象年月（YYYYMM形式）
-- AmiVoiceAPIアクセス用プラグイン-ami_cost_{Version}.zip
+- AmiVoiceAPIアクセス用プラグイン-ami_cost_{Version}.zip（[リリースページ](https://github.com/advanced-media-inc/amivoice-api-kintone-samples/releases/latest)から取得）
 - フォーム表示カスタムスクリプト-ami_maskkey.js
 
 ### 2.2 kintone アプリのフィールド設定
@@ -59,7 +59,7 @@
 ## 3. プラグイン（ami_cost_{version}.zip）の導入
 
 1. kintone のシステム管理を開きます。
-2. プラグインの管理画面で、`ami_cost_{version}.zip` などのプラグイン ZIP ファイルをインストールします。
+2. プラグインの管理画面で、[リリースページ](https://github.com/advanced-media-inc/amivoice-api-kintone-samples/releases/latest)から取得した `ami_cost_{version}.zip` などのプラグイン ZIP ファイルをインストールします。
 3. kintone のアプリ管理画面から対象アプリを開きます。
 4. アプリの設定画面で「プラグイン」を開き、インストールしたプラグインをアプリに適用します。
 5. アプリを更新して設定を反映します。

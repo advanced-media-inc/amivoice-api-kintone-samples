@@ -2,9 +2,9 @@
 
 ## 1. このリソースでできること
 
-このフォルダには、AmiVoice API を使って kintone のレコードに添付した音声ファイルを文字起こしするための、次のリソースが含まれています。
+AmiVoice API を使って kintone のレコードに添付した音声ファイルを文字起こしするための、次のリソースを使います。いずれも[リリースページ](https://github.com/advanced-media-inc/amivoice-api-kintone-samples/releases/latest)から取得できます。
 
-- kintone アプリテンプレート: `AmiSimpleES`
+- kintone アプリテンプレート: `AmiSimpleES.zip`
 - kintone プラグイン本体: `ami_stt_{version}.zip`　（{version}はプラグインバージョン）
 
 レコードの保存後、レコード詳細画面を開くとプラグインが音声ファイルを取得し、AmiVoice API へ送信します。認識結果、API レスポンス、処理状態を同じレコードへ保存します。
@@ -48,7 +48,7 @@
 ### プラグインを追加する
 
 1. kintone のシステム管理またはアプリ設定で「プラグイン」を開きます。
-2. speech-to-text内のプラグインami_stt_xxx.zip ファイルを読み込みます。
+2. [リリースページ](https://github.com/advanced-media-inc/amivoice-api-kintone-samples/releases/latest)から取得した `ami_stt_{version}.zip` ファイルを読み込みます。
 3. 対象アプリのプラグイン一覧で AmiVoice STT Node を追加します。
 4. プラグインを有効にして保存します。
 5. アプリを更新します。
