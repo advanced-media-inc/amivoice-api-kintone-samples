@@ -62,7 +62,8 @@ for i in "${!PLUGIN_DIRS[@]}"; do
   expected_id="${PLUGIN_IDS[$i]}"
 
   manifest="$REPO_ROOT/src/$dir/manifest.json"
-  version="$(node -e "console.log(require('$manifest').version)")"
+  # パスを引数で渡すと、Git Bash (Windows) でも /c/... が Windows 形式に変換される
+  version="$(node -p 'require(process.argv[1]).version' "$manifest")"
   out_zip="$OUT_DIR/${prefix}_${version}.zip"
 
   key_file="$KEYS_DIR/${dir}.ppk"
